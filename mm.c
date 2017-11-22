@@ -30,9 +30,9 @@ team_t team = {
     /* First member's email address */
     "louis.mutricy@polytechnique.edu",
     /* Second member's full name (leave blank if none) */
-    "Jean Baptiste De Cagny"
+    "Jean Baptiste de Cagny",
     /* Second member's email address (leave blank if none) */
-    ""
+    "jean-bapiste.de-cagny@polytechnique.edu",
 };
 
 /* single word (4) or double word (8) alignment */
@@ -124,6 +124,8 @@ void *mm_malloc(size_t size)
  */
 void mm_free(void *ptr)
 {
+  int address = (int) ((block*)ptr)->next;
+  ((block*)ptr)->next = (block*) (1|address);
 }
 
 /*
