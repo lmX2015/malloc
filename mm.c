@@ -32,7 +32,7 @@ team_t team = {
     /* Second member's full name (leave blank if none) */
     "Jean Baptiste de Cagny",
     /* Second member's email address (leave blank if none) */
-    "jean-bapiste.de-cagny@polytechnique.edu",
+    "jean-baptiste.de-cagny@polytechnique.edu",
 };
 
 /* single word (4) or double word (8) alignment */
@@ -40,7 +40,6 @@ team_t team = {
 
 /* rounds up to the nearest multiple of ALIGNMENT */
 #define ALIGN(size) (((size) + (ALIGNMENT-1)) & ~0x7)
-
 
 #define SIZE_T_SIZE (ALIGN(sizeof(size_t)))
 
@@ -51,21 +50,8 @@ typedef struct block block;
 struct block{
 	block * next;
 };
+void* last;
 
-int getSize(block* b){
-	if (b->next ==NULL) {
-		void *last =mem_heap_hi();
-		return((char*)last-(char*)b);
-	}
-	
-	return (((char*)b->next)-((char*)b)-4);
-
-}
-int isFree(block* b){
-	if (b->next==NULL) return 1;
-	int address = (int) b->next;
-	return (1&address);
-}
 block* getNext(block *b){
 	block * bNext = b->next;
 	int bInt = (int)bNext;
@@ -77,6 +63,11 @@ block * getFirst(){
 	return  (block*) first;
 	
 }
+int isFree(block* b){
+	if (b->next==NULL) return 0;
+	int address = (int) b->next;
+	return (1&address);
+}
 /* block structure (size,pointer next)*/
 block * findNextFree(){
 	
@@ -87,13 +78,22 @@ block * findNextFree(){
 	}
 	return b;		
 }
+int getSize(block* b){
+	if ((void *)getNext(b) ==last) {
+		return((char*)last-(char*)b);
+	}
+	
+	return (((char*)getNext(b))-((char*)b)-4);
+
+}
+
 int mm_init(void)
 {	
-
+	printf("init");
 	void *  first =mem_heap_lo();
-	
+	last = mem_heap_hi();
 	block * b = (block*) first;
-	b ->next = NULL;
+	b ->next = (block*) last;
 	mem_sbrk(32);
 	//printf("%d\n", mem_heapsize());
 	//printf("%d\n", getSize(getFirst()));
@@ -109,6 +109,7 @@ int mm_init(void)
  */
 void *mm_malloc(size_t size)
 {
+    printf("Try to allocate");
     int newsize = ALIGN(size + SIZE_T_SIZE);
     void *p = mem_sbrk(newsize);
     if (p == (void *)-1)
