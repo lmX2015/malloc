@@ -74,9 +74,10 @@ block * findNextFree(){
 	
 	//unsigned char =mem_heap_lo(void);
 	block* b = getFirst();
-	while (!isFree(b)){
+	while (!isFree(b)&& (void*)b!=last){
 	 	b = getNext(b);	
 	}
+	if (b==last)return NULL;
 	return b;		
 }
 int getSize(block* b){
@@ -87,26 +88,50 @@ int getSize(block* b){
 	return (((char*)getNext(b))-((char*)b)-4);
 
 }
+
 block * getLast(){
 	block* b = getFirst();
 	while((void *)getNext(b)!=last){
 		b = getNext(b);
-		
 	}
+	return b;
 }
 
 void increaseSize(int size){
 	mem_sbrk(size);
-	block * b =getLast;
+	block * b =getLast();
+	
 	if (isFree(b)){
-		
+		last = mem_heap_hi();
+		int address =(int)getNext(b);
+		b->next = (block*) (1|address);
+	
+	}
+	else {
+		b = getNext(b);
+		int address =(int)getNext(b);
+		b->next = (block*) (1|address);
 	}	 
 		
 	
 }
+block * findFirstFree(int size){
+	block * b =getFirst();
+	while(b!=NULL){
+		if (getSize(b)>=size) break;
+		b = findNextFree();	
+	}
+	if (b==NULL){
+		increaseSize(size+4);
+		return getLast();
+	}
+	return b;
+	
+}
+
 int mm_init(void)
 {	
-	printf("init");
+	printf("init\n");
 	void *  first =mem_heap_lo();
 	last = mem_heap_hi();
 	block * b = (block*) first;
@@ -126,15 +151,16 @@ int mm_init(void)
  */
 void *mm_malloc(size_t size)
 {
-    //printf("Try to allocate");
-    int newsize = ALIGN(size + SIZE_T_SIZE);
-    void *p = mem_sbrk(newsize);
-    if (p == (void *)-1)
-	return NULL;
-    else {
-        *(size_t *)p = size;
-        return (void *)((char *)p + SIZE_T_SIZE);
-    }
+    printf("Try to allocate\n");
+    //int newsize = ALIGN(size + SIZE_T_SIZE);
+    //void *p = mem_sbrk(newsize);
+    //if (p == (void *)-1)
+	//return NULL;
+    //else {
+      //  *(size_t *)p = size;
+        //return (void *)((char *)p + SIZE_T_SIZE);
+    //}
+    return findFirstFree((int )size);
 }
 
 /*
