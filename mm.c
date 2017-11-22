@@ -51,21 +51,8 @@ typedef struct block block;
 struct block{
 	block * next;
 };
+void* last;
 
-int getSize(block* b){
-	if (b->next ==NULL) {
-		void *last =mem_heap_hi();
-		return((char*)last-(char*)b);
-	}
-	
-	return (((char*)b->next)-((char*)b)-4);
-
-}
-int isFree(block* b){
-	if (b->next==NULL) return 1;
-	int address = (int) b->next;
-	return (1&address);
-}
 block* getNext(block *b){
 	block * bNext = b->next;
 	int bInt = (int)bNext;
@@ -77,6 +64,11 @@ block * getFirst(){
 	return  (block*) first;
 	
 }
+int isFree(block* b){
+	if (b->next==NULL) return 0;
+	int address = (int) b->next;
+	return (1&address);
+}
 /* block structure (size,pointer next)*/
 block * findNextFree(){
 	
@@ -87,13 +79,21 @@ block * findNextFree(){
 	}
 	return b;		
 }
+int getSize(block* b){
+	if ((void *)getNext(b) ==last) {
+		return((char*)last-(char*)b);
+	}
+	
+	return (((char*)getNext(b))-((char*)b)-4);
+
+}
+
 int mm_init(void)
 {	
-
 	void *  first =mem_heap_lo();
-	
+	last = mem_heap_hi();
 	block * b = (block*) first;
-	b ->next = NULL;
+	b ->next = (block*) last;
 	mem_sbrk(32);
 	//printf("%d\n", mem_heapsize());
 	//printf("%d\n", getSize(getFirst()));
@@ -109,6 +109,7 @@ int mm_init(void)
  */
 void *mm_malloc(size_t size)
 {
+   // printf("Try to allocate %")
     int newsize = ALIGN(size + SIZE_T_SIZE);
     void *p = mem_sbrk(newsize);
     if (p == (void *)-1)
