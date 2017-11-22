@@ -68,6 +68,7 @@ int isFree(block* b){
 	int address = (int) b->next;
 	return (1&address);
 }
+
 /* block structure (size,pointer next)*/
 block * findNextFree(){
 	
@@ -86,7 +87,23 @@ int getSize(block* b){
 	return (((char*)getNext(b))-((char*)b)-4);
 
 }
+block * getLast(){
+	block* b = getFirst();
+	while((void *)getNext(b)!=last){
+		b = getNext(b);
+		
+	}
+}
 
+void increaseSize(int size){
+	mem_sbrk(size);
+	block * b =getLast;
+	if (isFree(b)){
+		
+	}	 
+		
+	
+}
 int mm_init(void)
 {	
 	printf("init");
@@ -109,7 +126,7 @@ int mm_init(void)
  */
 void *mm_malloc(size_t size)
 {
-    printf("Try to allocate");
+    //printf("Try to allocate");
     int newsize = ALIGN(size + SIZE_T_SIZE);
     void *p = mem_sbrk(newsize);
     if (p == (void *)-1)
