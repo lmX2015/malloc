@@ -24,15 +24,15 @@
  ********************************************************/
 team_t team = {
     /* Team name */
-    "evilteam",
+    "LteaM",
     /* First member's full name */
     "Louis Mutricy",
     /* First member's email address */
     "louis.mutricy@polytechnique.edu",
     /* Second member's full name (leave blank if none) */
-    "Jean Baptiste de Cagny",
+    "",
     /* Second member's email address (leave blank if none) */
-    "jean-baptiste.de-cagny@polytechnique.edu",
+    "",
 };
 
 /* single word (4) or double word (8) alignment */
@@ -49,97 +49,216 @@ team_t team = {
 typedef struct block block;
 struct block{
 	block * next;
+
 };
-void* last;
+void* end;
+block* last;
+int enableDefrag =1; // use to disable defragmentatiom operations during reallloc and for perf comparaisons
+int part =1;// number of part in memory (ie 1+#malloc-#free)
 
 block* getNext(block *b){
 	block * bNext = b->next;
 	int bInt = (int)bNext;
-	bInt = bInt&(~7);
+	bInt = bInt&(~1);
 	return((block*) bInt);	
 }
 block * getFirst(){
 	void *  first =mem_heap_lo();
+	//if (verbose) printf("%d \n",(int ) block);
 	return  (block*) first;
 	
 }
 int isFree(block* b){
 	if (b->next==NULL) return 0;
 	int address = (int) b->next;
+	//if (verbose) printf("%d \n",1 &address);
 	return (1&address);
+
 }
 
 /* block structure (size,pointer next)*/
-block * findNextFree(){
+block * findNextFree(block* b){
 	
 	//unsigned char =mem_heap_lo(void);
-	block* b = getFirst();
-	while (!isFree(b)&& (void*)b!=last){
-	 	b = getNext(b);	
+	//block* b = getFirst();
+	while ((!isFree(b))&&( (void*)b!=last)){
+	// 	printf("trying %p\n",b);
+		b = getNext(b);	
 	}
-	if (b==last)return NULL;
+	if (!isFree(b))return NULL;
+//	printf("free block found : %p\n",(void*)b);
 	return b;		
 }
 int getSize(block* b){
-	if ((void *)getNext(b) ==last) {
-		return((char*)last-(char*)b);
+	if ((void *)getNext(b) ==end) {
+		//printf("Warning : last Block");
+		return(((char*)end-(char*)b)-8);
 	}
-	
-	return (((char*)getNext(b))-((char*)b)-4);
+
+	return (((char*)getNext(b))-((char*)b)-8);
 
 }
 
 block * getLast(){
 	block* b = getFirst();
-	while((void *)getNext(b)!=last){
+	while((void *)getNext(b)!=end){
 		b = getNext(b);
 	}
 	return b;
 }
 
+// return address with flag 1 
+block* setfree(block* b){
+	int acc= (int)b;
+	acc = acc |1;
+	return ((block*)acc);
+}
+//remove flag or set it to 0
+block* clear(block* b){
+	int acc = (int)b;
+	acc = acc & (~1);
+	return ((block*)acc);
+
+
+}
+
 void increaseSize(int size){
-	mem_sbrk(size);
-	block * b =getLast();
-	
+	void* n =mem_sbrk(size);
+	block * b =last;
+	end =(void*)(((char*) mem_heap_hi())+1);
+
+	//case 1 : last block is free. 
 	if (isFree(b)){
-		last = mem_heap_hi();
-		int address =(int)getNext(b);
-		b->next = (block*) (1|address);
+	//	end = mem_heap_hi();
+	//	end =(void*)(((char*) mem_heap_hi())+1);
+		b->next = setfree(end);
+		
 	
 	}
+	//case 2 b is not free
 	else {
-		b = getNext(b);
-		int address =(int)getNext(b);
-		b->next = (block*) (1|address);
+		block* newb = (block*) n;
+		last->next= newb;
+		newb->next= setfree(end); 	
 	}	 
 		
 	
 }
+void defragmente(block *b){
+	//printf("test\n");	
+	if (b>last)return;
+	block * n=b;
+        
+	while ((n!=last)&&(isFree(n))){
+               	 
+		 n= getNext(n);
+        	 b->next=setfree(n);
+	}
+	//printf("critical : n %p b: %p max: %p, bn: %p \n",n,b,mem_heap_hi(),(void*)getNext(b));
+	
+
+}
+
 block * findFirstFree(int size){
 	block * b =getFirst();
+	b= findNextFree(b);
+	block * defragmented = NULL; // last block defragmented
 	while(b!=NULL){
+		
 		if (getSize(b)>=size) break;
-		b = findNextFree();	
+		// special case where the last block is free but too small
+		// pb : getNext(b) is out of bound
+		if (b==last){
+			b=NULL;
+			break;
+		}
+		if(isFree(getNext(b))&&(defragmented!=b)){
+			//printf("defragmenting at %p\n",b);
+			defragmented =b;
+			if (enableDefrag)defragmente(b);
+		}
+		else b=findNextFree(getNext(b));
 	}
 	if (b==NULL){
-		increaseSize(size+4);
+		increaseSize(size+8);
 		return getLast();
 	}
 	return b;
+
+}
+// alternative strattegy to allocate  but seems less efficient 
+block* findOneFree(int size){
+	int found =0;
+	block * result=NULL;
+	block * b =getFirst();
+	b= findNextFree(b);
+	block * defragmented = NULL; // last block defragmented
+	while(b!=NULL){
+		
+		if (getSize(b)>=size) {
+			
+			if (!found)result =b;
+			else {
+				if (getSize(result)>getSize(b))result=b;
+			}
+			found=1;
+			if(getSize(b)<=2*size){
+				result=b;
+				break;
+			}//only take small parts
+		}
+		// special case where the last block is free but too small
+		// pb : getNext(b) is out of bound
+		if (b==last){
+			b=NULL;
+			break;
+		}
+		if(isFree(getNext(b))&&(defragmented!=b)){
+			//printf("defragmenting at %p\n",b);
+			defragmented =b;
+			if (enableDefrag)defragmente(b);
+		}
+		else b=findNextFree(getNext(b));
+	}
+	if (!found){
+		increaseSize(size+8-getSize(last));
+		return getLast();
+	}
+	return result;
+	
+}
+//choose strategy ...
+block * findOpt(int size){
+//	if (part>100){
+//		printf("part %d\n",part);
+//		return findOneFree(size);
+//	}
+//	printf("%d\n",part);
+	return findFirstFree(size);
+
+}
+void take(block *b,int size){
+	//block*  nextblock=getNext(b);
+	if(getSize(b)-size>8){
+		block * newb = (block*)((char*)b+size+8);
+		newb ->next =(block*)(((int)getNext(b))|1);
+	 	b->next= (block*)(((int)newb)&(~1));
+		if(b==last){
+			last=newb;
+		}
+		return;
+	}
+	b->next= (block*)(((int)getNext(b))&(~1));
 	
 }
 
 int mm_init(void)
 {	
-	printf("init\n");
-	void *  first =mem_heap_lo();
-	last = mem_heap_hi();
+	void * first = mem_sbrk(16);	
+	end =(void*)(((char*) mem_heap_hi())+1);
 	block * b = (block*) first;
-	b ->next = (block*) last;
-	mem_sbrk(32);
-	//printf("%d\n", mem_heapsize());
-	//printf("%d\n", getSize(getFirst()));
-	
+	b ->next = (block*) (((int) end)|1);
+	last = getLast();
 	return 0;
 }
 
@@ -151,25 +270,32 @@ int mm_init(void)
  */
 void *mm_malloc(size_t size)
 {
-    printf("Try to allocate\n");
-    //int newsize = ALIGN(size + SIZE_T_SIZE);
-    //void *p = mem_sbrk(newsize);
-    //if (p == (void *)-1)
-	//return NULL;
-    //else {
-      //  *(size_t *)p = size;
-        //return (void *)((char *)p + SIZE_T_SIZE);
-    //}
-    return findFirstFree((int )size);
+    //printf("Try to allocate %d\n",(int)size);
+   //int newsize = ALIGN(size + SIZE_T_SIZE);
+   int newsize =ALIGN(size+8);  
+
+    
+    block* b= findOpt(newsize);
+    if (((char*)b+newsize)-((char*)mem_heap_hi())>0){
+	printf("ran out of memory\n");
+	return NULL;	
+    }
+    //printf("allocate at %p\n",(void*)b);
+    take(b,newsize -8);
+    part++;
+    return((void*)((( char*) b)+8));
 }
 
 /*
- * mm_free - Freeing a block does nothing.
+ * mm_free - just set the flag to free
  */
 void mm_free(void *ptr)
 {
-  int address = (int) ((block*)ptr)->next;
-  ((block*)ptr)->next = (block*) (1|address);
+	if (ptr==NULL)return;
+	part --;
+	block *b = (block*)((char*)ptr-8);
+	b->next= setfree(b->next);
+	defragmente(b);
 }
 
 /*
@@ -177,19 +303,38 @@ void mm_free(void *ptr)
  */
 void *mm_realloc(void *ptr, size_t size)
 {
-    void *oldptr = ptr;
-    void *newptr;
-    size_t copySize;
-    
-    newptr = mm_malloc(size);
-    if (newptr == NULL)
-      return NULL;
-    copySize = *(size_t *)((char *)oldptr - SIZE_T_SIZE);
-    if (size < copySize)
-      copySize = size;
-    memcpy(newptr, oldptr, copySize);
-    mm_free(oldptr);
-    return newptr;
+	enableDefrag=0;	
+	if (size==0){
+		enableDefrag=1;
+		mm_free(ptr);
+		return NULL;
+	}
+	if (ptr==NULL){
+		enableDefrag=1;
+		return mm_malloc(size);
+		
+	}
+	void *oldptr = ptr;
+	void * newptr;
+	size_t copySize;
+	size_t oldSize;
+	block * oldb = (block *)((char*)ptr - 8);
+	oldSize =(size_t) getSize(oldb);
+	mm_free(ptr);
+	newptr = mm_malloc(size);
+	if (newptr ==NULL){
+		enableDefrag=1;
+		printf("Realloc failed due to malloc failed \n");
+		return NULL;
+	}
+	copySize = oldSize;
+	if (copySize >size)copySize=size;
+	
+	
+	memcpy(newptr,oldptr,copySize);
+	enableDefrag=1;
+	return newptr;
+  
 }
 
 
